@@ -1,2 +1,2 @@
 # alias_all_py_bot
-## first you need to start bot, add him to admin and send 1 message, after all, u'l able to use alias @all
+## First, each chat participant needs to launch the bot, add it to the admins, and send 1 message. After that, you can use the @all alias
