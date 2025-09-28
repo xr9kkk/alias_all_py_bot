@@ -10,14 +10,12 @@ load_dotenv()
 MEMBERS_FILE = 'members.json'
 
 def load_members():
-    """Загружаем данные из файла"""
     if os.path.exists(MEMBERS_FILE):
         with open(MEMBERS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     return {}
 
 def save_member(chat_id, user_id, username, first_name, is_bot=False):
-    """Сохраняем информацию о пользователе (исключая ботов)"""
     
     if is_bot:
         return
@@ -39,13 +37,11 @@ def save_member(chat_id, user_id, username, first_name, is_bot=False):
         json.dump(members, f, ensure_ascii=False, indent=2)
 
 def get_all_members(chat_id):
-    """Получаем всех участников чата (исключая ботов)"""
     members = load_members()
     chat_key = str(chat_id)
     return members.get(chat_key, {})
 
 def create_safe_mention_text(members):
-    """Создает безопасный текст для упоминаний без Markdown"""
     if not members:
         return "❌ Нет участников для упоминания"
     
@@ -126,7 +122,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
 async def track_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отслеживаем новых участников (исключая ботов)"""
     if update.message.new_chat_members:
         chat_id = update.message.chat_id
         
@@ -150,7 +145,6 @@ async def track_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(welcome_text)
 
 async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда для очистки списка участников (только для админов)"""
     chat_id = update.message.chat_id
     
     try:
@@ -181,7 +175,6 @@ async def cleanup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Ошибка при выполнении команды: {e}")
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработчик ошибок"""
     print(f"Произошла ошибка: {context.error}")
     
     if update and update.message:
@@ -191,7 +184,6 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
 def main():
-    """Основная функция"""
     TOKEN = os.getenv('BOT_TOKEN')
     
     application = Application.builder().token(TOKEN).build()
