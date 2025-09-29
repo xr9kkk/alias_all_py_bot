@@ -3,20 +3,79 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import json
 import os
 import html
+import atexit
+import subprocess
+import signal
+import sys
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
 MEMBERS_FILE = 'members.json'
 
+def setup_sync():
+    """Настраивает синхронизацию при запуске и завершении"""
+    # Синхронизируем при запуске
+    sync_with_github()
+    
+    # Регистрируем функцию для синхронизации при завершении
+    atexit.register(sync_on_exit)
+
+def sync_with_github():
+    try:
+        print("🔁 Проверяем обновления с GitHub...")
+        result = subprocess.run(["git", "pull"], 
+                              capture_output=True, text=True, cwd=os.getcwd())
+        if result.returncode == 0:
+            print("✅ Данные обновлены с GitHub")
+        else:
+            print("❌ Ошибка при получении данных:", result.stderr)
+    except Exception as e:
+        print(f"❌ Ошибка синхронизации: {e}")
+
+def sync_on_exit():
+    """Синхронизирует данные при завершении работы"""
+    try:
+        print("🔁 Отправляем данные на GitHub...")
+        
+        # Проверяем есть ли изменения
+        result = subprocess.run(["git", "status", "--porcelain"], 
+                              capture_output=True, text=True, cwd=os.getcwd())
+        
+        if "members.json" in result.stdout:
+            from datetime import datetime
+            
+            # Добавляем файл
+            subprocess.run(["git", "add", "members.json"], check=True, cwd=os.getcwd())
+            
+            # Коммитим
+            commit_message = f"Auto-sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            subprocess.run(["git", "commit", "-m", commit_message], 
+                         check=True, cwd=os.getcwd())
+            
+            # Пушим
+            subprocess.run(["git", "push"], check=True, cwd=os.getcwd())
+            print("✅ Данные отправлены на GitHub")
+        else:
+            print("ℹ️ Изменений нет, синхронизация не требуется")
+            
+    except Exception as e:
+        print(f"❌ Ошибка при отправке данных: {e}")
+
+
 def load_members():
+    """Загружаем данные из файла"""
     if os.path.exists(MEMBERS_FILE):
-        with open(MEMBERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(MEMBERS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print("❌ Ошибка чтения members.json, создаем новый файл")
+            return {}
     return {}
 
 def save_member(chat_id, user_id, username, first_name, is_bot=False):
-    
     if is_bot:
         return
     
@@ -183,7 +242,17 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
+async def sync_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔄 Синхронизирую данные с GitHub...")
+    
+    try:
+        sync_with_github()
+        await update.message.reply_text("✅ Синхронизация завершена!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка синхронизации: {e}")
+
 def main():
+    setup_sync()
     TOKEN = os.getenv('BOT_TOKEN')
     
     application = Application.builder().token(TOKEN).build()
@@ -192,6 +261,7 @@ def main():
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("members", members_command))
     application.add_handler(CommandHandler("cleanup", cleanup_command))
+    application.add_handler(CommandHandler("sync", setup_sync))
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, track_new_members))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
